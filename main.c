@@ -2,7 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define MAX_INPUT 100
+#define MAX_INPUT 10000
 #define INF 2147483647
 
 typedef struct node{
@@ -20,7 +20,7 @@ typedef struct list_node{
     struct list_node * prev;
 } list_node;
 
-void aggiungi_stazione(int);
+int aggiungi_stazione(int);
 void demolisci_stazione(int);
 int aggiungi_auto(int, int);
 void rottama_auto(int, int);
@@ -29,7 +29,6 @@ void pianifica_percorso(int, int);
 void printStations();
 
 
-node_t *  delete(node_t *);
 node_t * deleteNode(node_t * root, int k);
 node_t * insertCar(node_t * root, int autonomy);
 
@@ -37,6 +36,7 @@ void inOrderPrint(node_t *pNode);
 void printCost();
 
 void update_cost_matrix();
+void checkMaximums();
 
 list_node * stations = NULL;
 int * station_array;
@@ -63,16 +63,19 @@ int main() {
             //Aggiungo la stazione al kilometro giusto
             token = strtok(NULL, " ");
             int kilometer = atoi(token);
-            aggiungi_stazione(kilometer);
+            int esito = aggiungi_stazione(kilometer);
 
             //Ogni macchina da input viene aggiunta alla stazione giusta
-            token = strtok(NULL, " ");
-            int car_num = atoi(token);
-            for(int i=0; i < car_num; i++){
+            if(!esito){
                 token = strtok(NULL, " ");
-                int car_autonomy = atoi(token);
-                aggiungi_auto(kilometer, car_autonomy);
+                int car_num = atoi(token);
+                for(int i=0; i < car_num; i++){
+                    token = strtok(NULL, " ");
+                    int car_autonomy = atoi(token);
+                    aggiungi_auto(kilometer, car_autonomy);
+                }
             }
+
         }
         else if(!strcmp(token, "demolisci-stazione")){
             int kilometer = atoi(strtok(NULL, " "));
@@ -100,8 +103,11 @@ int main() {
         else if(!strcmp(token, "stampa-c\n")){
             printCost();
         }
+        else if(!strcmp(token, "max\n")){
+            checkMaximums();
+        }
         else{
-            perror("Comando di input non riconosciuto \n");
+            printf("Comando di input non riconosciuto \n");
         }
 
         if(input == NULL)
@@ -130,25 +136,38 @@ int maximum(node_t * root){
 }
 
 void rottama_auto(int kilometer, int autonomy) {
-    list_node * curr = stations;
+    list_node* curr = stations;
 
-    while(curr->next != NULL && curr->kilometer != kilometer){
+    while (curr->next != NULL && curr->kilometer != kilometer) {
         curr = curr->next;
     }
-    if(curr->kilometer == kilometer){
+    if (curr != NULL && curr->kilometer == kilometer) {
         curr->cars = deleteNode(curr->cars, autonomy);
-        if(curr->max_autonomy == autonomy){
-            curr->max_autonomy = maximum(curr->cars);
+        int max_autonomy = maximum(curr->cars);
+        if (curr->max_autonomy != max_autonomy) {
+            curr->max_autonomy = max_autonomy;
             update_cost_matrix();
         }
+    } else {
+        printf("non rottamata\n");
     }
-    else
-        perror("non rottamata");
-
 }
 
-void aggiungi_stazione(int k) {
-    list_node *curr;
+void checkMaximums(){
+    list_node * curr = stations;
+
+    if(curr != NULL){
+        if(curr->max_autonomy != maximum(curr->cars))
+            printf("ERROREEEEE: (stazione %d) Massimo salvato: %d, massimo reale: %d\n", curr->kilometer, curr->max_autonomy, maximum(curr->cars));
+
+        curr = curr->next;
+    }
+}
+
+
+
+int aggiungi_stazione(int k) {
+    list_node *curr = NULL;
 
     list_node *new = (list_node *)malloc(sizeof(list_node));
     new->kilometer = k;
@@ -158,15 +177,22 @@ void aggiungi_stazione(int k) {
 
     if (stations == NULL)
         stations = new;
-    else if (stations->kilometer >= k) {
+    else if (stations->kilometer > k) {
         new->next = stations;
         new->next->prev = new;
         stations = new;
-    } else {
+    }
+    else {
         curr = stations;
 
-        while (curr->next != NULL && curr->next->kilometer < new->kilometer)
+        while (curr->next != NULL && curr->next->kilometer <= new->kilometer)
             curr = curr->next;
+
+        if(curr->kilometer == k){
+            free(new);
+            printf("non aggiunta\n");
+            return 1;
+        }
 
         new->next = curr->next;
 
@@ -179,6 +205,7 @@ void aggiungi_stazione(int k) {
 
     stationNumber++;
     printf("aggiunta\n");
+    return 0;
 }
 
 int aggiungi_auto(int kilometer, int autonomy){
@@ -222,21 +249,27 @@ node_t * insertCar(node_t * root, int autonomy){
     return root;
 }
 
-void demolisci_stazione(int k){
-    list_node * curr;
+node_t * freeTree(node_t *);
 
-    if(stations == NULL)
+void demolisci_stazione(int k) {
+    list_node* curr;
+
+    if (stations == NULL)
         return;
-    else{
+    else {
         curr = stations;
 
-        while(curr != NULL) {
+        while (curr != NULL) {
             if (curr->kilometer == k) {
                 if (curr->prev != NULL)
                     curr->prev->next = curr->next;
+                else
+                    stations = curr->next; // Update stations pointer if we delete the first element
+
                 if (curr->next != NULL)
                     curr->next->prev = curr->prev;
-                curr->cars = delete(curr->cars);
+
+                curr->cars = freeTree(curr->cars);
                 free(curr);
                 stationNumber--;
                 printf("demolita\n");
@@ -250,70 +283,66 @@ void demolisci_stazione(int k){
     }
 }
 
-node_t * deleteNode(node_t * root, int k){
-    if (root == NULL){
+
+node_t* deleteNode(node_t* root, int k) {
+    if (root == NULL) {
         printf("non rottamata\n");
         return root;
     }
 
     if (root->aut > k) {
         root->left = deleteNode(root->left, k);
-        return root;
-    }
-    else if (root->aut < k) {
+    } else if (root->aut < k) {
         root->right = deleteNode(root->right, k);
-        return root;
-    }
+    } else {
+        if (root->quantity > 1) {
+            root->quantity--;
+            printf("rottamata\n");
+        } else {
+            if (root->left == NULL) {
+                node_t* temp = root->right;
+                free(root);
+                printf("rottamata\n");
+                return temp;
+            } else if (root->right == NULL) {
+                node_t* temp = root->left;
+                free(root);
+                printf("rottamata\n");
+                return temp;
+            }
+            else {
+                node_t* succParent = root;
+                node_t* succ = root->right;
+                while (succ->left != NULL) {
+                    succParent = succ;
+                    succ = succ->left;
+                }
 
-    if (root->left == NULL && root->quantity == 1) {
-        node_t * temp = root->right;
-        if(root->quantity == 1)
-            free(root);
-        else
-            root->quantity--;
-        return temp;
-    }
-    else if (root->right == NULL && root->quantity == 1) {
-        node_t  * temp = root->left;
-        if(root->quantity == 1)
-            free(root);
-        else
-            root->quantity--;
-        return temp;
-    }
-    else {
-        node_t * succParent = root;
-        node_t * succ = root->right;
-        while (succ->left != NULL) {
-            succParent = succ;
-            succ = succ->left;
+                if (succParent != root)
+                    succParent->left = succ->right;
+                else
+                    succParent->right = succ->right;
+
+                root->aut = succ->aut;
+                root->quantity = succ->quantity;
+
+                free(succ);
+                printf("rottamata\n");
+            }
+
         }
-
-        if (succParent != root)
-            succParent->left = succ->right;
-        else
-            succParent->right = succ->right;
-
-        root->aut = succ->aut;
-
-        if(succ->quantity == 1)
-            free(succ);
-        else
-            succ->quantity--;
-
-        printf("rottamata\n");
-        return root;
     }
+
+    return root;
 }
 
-node_t * delete(node_t * root){
-    if(root->left != NULL)
-        root->left = delete(root->left);
 
-    if(root->right != NULL)
-        root->right = delete(root->right);
-
-    free(root);
+node_t * freeTree(node_t* root) {
+    if (root != NULL) {
+        freeTree(root->left);
+        freeTree(root->right);
+        free(root);
+    }
     return NULL;
 }
 
@@ -395,10 +424,10 @@ void print_reverse_path(int start, int end, const int *pred) {
 
     // Print the stations in reverse order
     printf("%d ", station_array[stack[top]]);
-    for (int i = top - 1; i >= 0; i--) {
+    for (int i = top - 1; i > 0; i--) {
         printf("%d ", station_array[stack[i]]);
     }
-    printf("\n");
+    printf("%d\n", station_array[stack[0]]);
 }
 
 void printCost(){
@@ -419,8 +448,9 @@ void pianifica_percorso(int inizio, int fine){
             inizio_ind = i;
         if(station_array[i] == fine){
             fine_ind = i;
-            break;
         }
+        if(inizio_ind != -1 && fine_ind != -1)
+            break;
     }
 
     if(inizio_ind == -1 || fine_ind == -1){
@@ -450,8 +480,10 @@ void pianifica_percorso(int inizio, int fine){
         //check if a better path exists through nextnode
         if(nextnode != -1)
             visited[nextnode]=1;
-        else
-            exit(1);
+        else{
+            printf("nessun percorso\n");
+            return;
+        }
         for(int i=0;i<stationNumber;i++)
             if(!visited[i] && mindistance != INF && cost_matrix[nextnode][i] != INF) {
                 if (mindistance + cost_matrix[nextnode][i] < distance[i]) {
@@ -459,7 +491,7 @@ void pianifica_percorso(int inizio, int fine){
                     pred[i] = nextnode;
                 }
                 else if (mindistance + cost_matrix[nextnode][i] == distance[i])
-                    pred[i] = station_array[pred[i]] > station_array[nextnode] ? pred[i] : nextnode;
+                    pred[i] = station_array[pred[i]] < station_array[nextnode] ? pred[i] : nextnode;
             }
         count++;
     }
