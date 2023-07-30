@@ -36,6 +36,8 @@ void inOrderPrint(node_t *pNode);
 void printCost();
 
 void update_cost_matrix();
+void update_station();
+void update_car();
 void checkMaximums();
 
 list_node * stations = NULL;
@@ -44,6 +46,9 @@ int * maximum_array;
 int stationNumber = 0;
 int dim = 0;
 int ** cost_matrix;
+
+//TODO: IDEA di tenere in memoria anche le distanze calcolate?
+//TODO: IDEA non cancellare la matrice delle distanze ogni vol
 
 int main() {
     setbuf(stdout, NULL);
@@ -146,7 +151,7 @@ void rottama_auto(int kilometer, int autonomy) {
         int max_autonomy = maximum(curr->cars);
         if (curr->max_autonomy != max_autonomy) {
             curr->max_autonomy = max_autonomy;
-            update_cost_matrix();
+            //update_cost_matrix();
         }
     } else {
         printf("non rottamata\n");
@@ -205,6 +210,7 @@ int aggiungi_stazione(int k) {
 
     stationNumber++;
     printf("aggiunta\n");
+    //update_cost_matrix();
     return 0;
 }
 
@@ -217,7 +223,7 @@ int aggiungi_auto(int kilometer, int autonomy){
     if(curr->kilometer == kilometer){
         if(curr->max_autonomy < autonomy){
             curr->max_autonomy = autonomy;
-            update_cost_matrix();
+            //update_cost_matrix();
         }
         curr->cars = insertCar(curr->cars, autonomy);
         return 0;
@@ -273,6 +279,7 @@ void demolisci_stazione(int k) {
                 free(curr);
                 stationNumber--;
                 printf("demolita\n");
+                //update_cost_matrix();
                 return;
             }
 
@@ -332,7 +339,6 @@ node_t* deleteNode(node_t* root, int k) {
 
         }
     }
-
     return root;
 }
 
@@ -368,48 +374,6 @@ void printStations(){
     printf("]\n");
 }
 
-void update_cost_matrix(){
-    //Deallocate previously allocated memory
-    if (cost_matrix != NULL) {
-        for (int i = 0; i < dim; i++) {
-            free(cost_matrix[i]);
-        }
-        free(cost_matrix);
-    }
-
-    free(station_array);
-    free(maximum_array);
-
-    station_array = (int*)malloc(stationNumber * sizeof(int));
-    maximum_array = (int*)malloc(stationNumber * sizeof(int));
-    list_node * curr = stations;
-    int k = 0;
-    while(curr != NULL){
-        station_array[k] = curr->kilometer;
-        maximum_array[k] = curr->max_autonomy;
-        curr = curr->next;
-        k++;
-    }
-
-    cost_matrix = (int**)malloc(k * sizeof(int*));
-    for (int j = 0; j < k; j++) {
-        cost_matrix[j] = (int*)malloc(k * sizeof(int));
-    }
-
-    for(int i = 0; i < k; i++){
-        for(int j = 0; j < k; j++){
-            if(i == j)
-                cost_matrix[i][j] = 0;
-            else if(maximum_array[i] >= abs(station_array[i] - station_array[j]))
-                cost_matrix[i][j] = 1;
-            else
-                cost_matrix[i][j] = INF;
-        }
-    }
-
-    dim = stationNumber;
-}
-
 void print_reverse_path(int start, int end, const int *pred) {
     // Store the stations in a stack
     int stack[stationNumber];
@@ -440,7 +404,7 @@ void printCost(){
 }
 
 void pianifica_percorso(int inizio, int fine){
-    //update_cost_matrix();
+    update_cost_matrix();
     int inizio_ind = -1, fine_ind = -1, count, mindistance, nextnode = -1;
 
     for(int i = 0; i < stationNumber; i++){
@@ -502,4 +466,46 @@ void pianifica_percorso(int inizio, int fine){
     }
 
     print_reverse_path(inizio_ind, fine_ind, pred);
+}
+
+void update_cost_matrix(){
+    //Deallocate previously allocated memory
+    if (cost_matrix != NULL) {
+        for (int i = 0; i < dim; i++) {
+            free(cost_matrix[i]);
+        }
+        free(cost_matrix);
+    }
+
+    free(station_array);
+    free(maximum_array);
+
+    station_array = (int*)malloc(stationNumber * sizeof(int));
+    maximum_array = (int*)malloc(stationNumber * sizeof(int));
+    list_node * curr = stations;
+    int k = 0;
+    while(curr != NULL){
+        station_array[k] = curr->kilometer;
+        maximum_array[k] = curr->max_autonomy;
+        curr = curr->next;
+        k++;
+    }
+
+    cost_matrix = (int**)malloc(k * sizeof(int*));
+    for (int j = 0; j < k; j++) {
+        cost_matrix[j] = (int*)malloc(k * sizeof(int));
+    }
+
+    for(int i = 0; i < k; i++){
+        for(int j = 0; j < k; j++){
+            if(i == j)
+                cost_matrix[i][j] = 0;
+            else if(maximum_array[i] >= abs(station_array[i] - station_array[j]))
+                cost_matrix[i][j] = 1;
+            else
+                cost_matrix[i][j] = INF;
+        }
+    }
+
+    dim = stationNumber;
 }
