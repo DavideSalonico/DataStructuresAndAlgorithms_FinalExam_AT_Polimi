@@ -22,20 +22,22 @@ typedef struct list_node{
 } list_node;
 
 int aggiungi_stazione(int);
-//void demolisci_stazione(int);
 list_node * demolisci_stazione(list_node * root, int k);
 int aggiungi_auto(int, int);
 void rottama_auto(int, int);
-void pianifica_percorso(int, int);
+void pianifica_percorso(int, int, int);
 
 void printStations();
+
+list_node * findStation(int k);
+list_node * findSuccessor(list_node * root, list_node * node);
+list_node * findPredecessor(list_node * root, list_node * node);
 
 
 node_t * deleteNode(node_t * root, int k);
 node_t * insertCar(node_t * root, int autonomy);
 
 void inOrderPrint(node_t *pNode);
-void printCost();
 
 node_t * freeTree(node_t *);
 
@@ -46,14 +48,14 @@ list_node * stations = NULL;
 int * station_array;
 int * maximum_array;
 int stationNumber = 0;
-int dim = 0;
 int ** cost_matrix;
+
+int countNodes(list_node* curr);
 
 int main() {
     setbuf(stdout, NULL);
-    //struttura dati per memorizzare le macchine disponibili  --> BINARY TREE
-    //struttura dati per memorizzare le stazioni (albero? bilanciato?)  --> BINARY_TREE
     //TODO: alla creazione di una stazione mettere le macchine in blocchi + passare il puntatore della stazione direttamente
+    //TODO: matrice solo diagonale?
 
     char *input = (char *)malloc(MAX_INPUT * sizeof(char));
 
@@ -100,13 +102,65 @@ int main() {
         else if(!strcmp(token, "pianifica-percorso")){
             int inizio = atoi(strtok(NULL, " "));
             int fine = atoi(strtok(NULL, " "));
-            pianifica_percorso(inizio, fine);
+
+            int numNodes = countNodes(stations);
+            station_array = (int*) malloc(numNodes * sizeof(int));
+            maximum_array = (int*)malloc(numNodes * sizeof(int));
+
+            //Aggiorno strutture dati station_array e maximum_array
+            list_node * curr = findStation(inizio);
+            int inizio_ind = -1, fine_ind = -1, n = 0;
+            bool asc = inizio < fine ? true : false;
+            if(asc){
+                while(curr != NULL && curr->kilometer <= fine){
+                    station_array[n] = curr->kilometer;
+                    maximum_array[n] = curr->max_autonomy;
+                    if(curr->kilometer == inizio){
+                        inizio_ind = n;
+                    }
+                    else if(curr->kilometer == fine){
+                        fine_ind = n;
+                    }
+                    n++;
+
+                    curr = findSuccessor(stations, curr);
+                }
+            }
+            else{
+                while(curr != NULL && curr->kilometer >= fine){
+                    station_array[n] = curr->kilometer;
+                    maximum_array[n] = curr->max_autonomy;
+                    if(curr->kilometer == inizio){
+                        inizio_ind = n;
+                    }
+                    else if(curr->kilometer == fine){
+                        fine_ind = n;
+                    }
+                    n++;
+
+                    curr = findPredecessor(stations, curr);
+                }
+            }
+\
+            cost_matrix = (int**)malloc(n * sizeof(int*));
+            for (int j = 0; j < n; j++) {
+                cost_matrix[j] = (int*)malloc(n * sizeof(int));
+            }
+
+            pianifica_percorso(inizio_ind, fine_ind, n);
+
+
+            if (cost_matrix != NULL) {
+                for (int i = 0; i < n; i++) {
+                    free(cost_matrix[i]);
+                }
+                free(cost_matrix);
+            }
+            free(station_array);
+            free(maximum_array);
         }
         else if(!strcmp(token, "stampa\n")){
             printStations();
-        }
-        else if(!strcmp(token, "stampa-c\n")){
-            printCost();
         }
         /*else if(!strcmp(token, "max\n")){
             checkMaximums();
@@ -277,7 +331,7 @@ list_node * demolisci_stazione(list_node * root, int k) {
             else
                 succParent->right = succ->right;
 
-// Copy the data from successor node to the node to be deleted
+            // Copy the data from successor node to the node to be deleted
             root->kilometer = succ->kilometer;
             root->cars = succ->cars;
             root->max_autonomy = succ->max_autonomy;
@@ -398,15 +452,6 @@ void print_reverse_path(int start, int end, const int *pred, int n) {
     printf("%d\n", station_array[stack[0]]);
 }
 
-void printCost(){
-    for(int i = 0; i < dim; i++){
-        for (int j = 0; j < dim; j++){
-            printf("\t%d ", cost_matrix[i][j]);
-        }
-        printf("\n");
-    }
-}
-
 list_node * findStation(int k){
     if(stations == NULL)
         return NULL;
@@ -491,61 +536,14 @@ void inOrderCount(list_node* curr, int * k){
     }
 }
 
-void pianifica_percorso(int inizio, int fine){
-    //Aggiorno strutture dati station_array e maximum_array
-    list_node * curr = findStation(inizio);
-    int inizio_ind = -1, fine_ind = -1, n = 0;
-    bool asc = inizio < fine ? true : false;
-    list_node * mat_start = curr;
-    //TODO: to change
-    station_array = (int*)malloc(100000 * sizeof(int));
-    maximum_array = (int*)malloc(100000 * sizeof(int));
-    if(asc){
-        int min = inizio - curr->max_autonomy;
-        while(curr != NULL && curr->kilometer >= min){
-            curr = findPredecessor(stations, curr);
-            if(curr != NULL && curr->kilometer >= min) mat_start = curr;
-        }
-        curr = mat_start;
-        while(curr != NULL && curr->kilometer <= fine){
-            station_array[n] = curr->kilometer;
-            maximum_array[n] = curr->max_autonomy;
-            if(curr->kilometer == inizio){
-                inizio_ind = n;
-            }
-            else if(curr->kilometer == fine){
-                fine_ind = n;
-            }
-            n++;
+// Helper function to calculate the number of nodes in the tree
+int countNodes(list_node* curr) {
+    if (curr == NULL) return 0;
+    return countNodes(curr->left) + countNodes(curr->right) + 1;
+}
 
-            curr = findSuccessor(stations, curr);
-        }
-    }
-    else{
-        int max = inizio + curr->max_autonomy;
-        while(curr != NULL && curr->kilometer <= max){
-            curr = findSuccessor(stations, curr);
-            if(curr != NULL && curr->kilometer <= max) mat_start = curr;
-        }
-        curr = mat_start;
-        while(curr != NULL && curr->kilometer >= fine){
-            station_array[n] = curr->kilometer;
-            maximum_array[n] = curr->max_autonomy;
-            if(curr->kilometer == inizio){
-                inizio_ind = n;
-            }
-            else if(curr->kilometer == fine){
-                fine_ind = n;
-            }
-            n++;
-
-            curr = findPredecessor(stations, curr);
-        }
-    }
-
+void pianifica_percorso(int inizio_ind, int fine_ind, int n){
     update_cost_matrix(n);
-    dim = n;
-    //printCost();
 
     int count, mindistance, nextnode = -1;
 
@@ -598,23 +596,9 @@ void pianifica_percorso(int inizio, int fine){
     }
 
     print_reverse_path(inizio_ind, fine_ind, pred, n);
-
-    if (cost_matrix != NULL) {
-        for (int i = 0; i < n; i++) {
-            free(cost_matrix[i]);
-        }
-        free(cost_matrix);
-    }
-    free(station_array);
-    free(maximum_array);
 }
 
 void update_cost_matrix(int n){
-    cost_matrix = (int**)malloc(n * sizeof(int*));
-    for (int j = 0; j < n; j++) {
-        cost_matrix[j] = (int*)malloc(n * sizeof(int));
-    }
-
     for(int i = 0; i < n; i++){
         for(int j = 0; j < n; j++){
             if(i == j)
