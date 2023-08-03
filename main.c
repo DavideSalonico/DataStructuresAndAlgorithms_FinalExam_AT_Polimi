@@ -27,9 +27,9 @@ typedef struct{
     int max_size;
 } Queue;
 
-int aggiungi_stazione(int);
+list_node * aggiungi_stazione(int);
 list_node * demolisci_stazione(list_node * root, int k);
-int aggiungi_auto(int, int);
+int aggiungi_auto(list_node *, int);
 void rottama_auto(int, int);
 void pianifica_percorso_list(int, int, int);
 
@@ -45,12 +45,10 @@ int countNodes(list_node* curr);
 void print_reverse_path(const int *, int);
 
 void build_adjList(int n);
-void printAdj(int n);
 
 void pushQueue(Queue * , int);
 int popQueue(Queue *);
 bool isEmpty(Queue);
-void printQueue(Queue *queue);
 
 list_node * stations = NULL;
 int * station_array;
@@ -60,8 +58,6 @@ int * adjList;
 
 int main() {
     setbuf(stdout, NULL);
-    //TODO: alla creazione di una stazione mettere le macchine in blocchi + passare il puntatore della stazione direttamente
-    //TODO: liste di adiacenza + BFS
 
     char *input = (char *)malloc(MAX_INPUT * sizeof(char));
 
@@ -73,19 +69,17 @@ int main() {
 
         char * token = strtok(input, " ");
         if(!strcmp(token, "aggiungi-stazione")){
-            //Aggiungo la stazione al kilometro giusto
             token = strtok(NULL, " ");
             int kilometer = atoi(token);
-            int esito = aggiungi_stazione(kilometer);
+            list_node * staz = aggiungi_stazione(kilometer);
 
-            //Ogni macchina da input viene aggiunta alla stazione giusta
-            if(!esito){
+            if(staz != NULL){
                 token = strtok(NULL, " ");
                 int car_num = atoi(token);
                 for(int i=0; i < car_num; i++){
                     token = strtok(NULL, " ");
                     int car_autonomy = atoi(token);
-                    aggiungi_auto(kilometer, car_autonomy);
+                    aggiungi_auto(staz, car_autonomy);
                 }
             }
 
@@ -97,7 +91,8 @@ int main() {
         else if(!strcmp(token, "aggiungi-auto")){
             int kilometer = atoi(strtok(NULL, " "));
             int autonomy = atoi(strtok(NULL, " "));
-            int res = aggiungi_auto(kilometer, autonomy);
+            list_node * staz = findStation(kilometer);
+            int res = aggiungi_auto(staz, autonomy);
             res == 0 ? printf("aggiunta\n") : printf("non aggiunta\n");
         }
         else if(!strcmp(token, "rottama-auto")){
@@ -113,7 +108,6 @@ int main() {
             station_array = (int*) malloc(numNodes * sizeof(int));
             maximum_array = (int*)malloc(numNodes * sizeof(int));
 
-            //Aggiorno strutture dati station_array e maximum_array
             list_node * curr = findStation(inizio);
             int inizio_ind = -1, fine_ind = -1, n = 0;
             bool asc = inizio < fine ? true : false;
@@ -198,7 +192,7 @@ void rottama_auto(int kilometer, int autonomy) {
     }
 }
 
-int aggiungi_stazione(int k) {
+list_node * aggiungi_stazione(int k) {
     list_node *curr = NULL;
 
     list_node *new = (list_node *)malloc(sizeof(list_node));
@@ -211,7 +205,7 @@ int aggiungi_stazione(int k) {
         stations = new;
         stationNumber++;
         printf("aggiunta\n");
-        return 0;
+        return new;
     }
     else {
         curr = stations;
@@ -222,7 +216,7 @@ int aggiungi_stazione(int k) {
                     curr->left = new;
                     stationNumber++;
                     printf("aggiunta\n");
-                    return 0;
+                    return new;
                 } else
                     curr = curr->left;
             } else if (k > curr->kilometer) {
@@ -230,37 +224,30 @@ int aggiungi_stazione(int k) {
                     curr->right = new;
                     stationNumber++;
                     printf("aggiunta\n");
-                    return 0;
+                    return new;
                 } else
                     curr = curr->right;
             } else {
                 free(new);
                 printf("non aggiunta\n");
-                return 1;
+                return NULL;
             }
         }
     }
-    return 1;
+    return NULL;
 }
 
 
-int aggiungi_auto(int kilometer, int autonomy){
-    list_node * curr = stations;
-
-    while(curr != NULL && curr->kilometer != kilometer){
-        curr =  kilometer > curr->kilometer ? curr->right : curr->left;
-    }
-    if(curr == NULL)
+int aggiungi_auto(list_node * staz, int autonomy){
+    if(staz == NULL)
         return 1;
-    if(curr->kilometer == kilometer){
-        if(curr->max_autonomy < autonomy){
-            curr->max_autonomy = autonomy;
+    else{
+        if(staz->max_autonomy < autonomy){
+            staz->max_autonomy = autonomy;
         }
-        curr->cars = insertCar(curr->cars, autonomy);
+        staz->cars = insertCar(staz->cars, autonomy);
         return 0;
     }
-    else
-        return 1;
 }
 
 node_t * newNode(int val){
@@ -305,7 +292,6 @@ list_node * demolisci_stazione(list_node * root, int k) {
     } else if (root->kilometer < k) {
         root->right = demolisci_stazione(root->right, k);
     } else {
-        // Free the cars' memory
         freeCarTree(root->cars);
 
         if (root->left == NULL) {
@@ -333,12 +319,11 @@ list_node * demolisci_stazione(list_node * root, int k) {
             else
                 succParent->right = succ->right;
 
-            // Copy the data from successor node to the node to be deleted
             root->kilometer = succ->kilometer;
             root->cars = succ->cars;
             root->max_autonomy = succ->max_autonomy;
 
-            free(succ); // Free the successor node
+            free(succ);
             printf("demolita\n");
 
         }
@@ -524,64 +509,28 @@ int countNodes(list_node* curr) {
     return countNodes(curr->left) + countNodes(curr->right) + 1;
 }
 
-void print_path(int inizio_ind, int fine_ind, int pred[]) {
-    if (fine_ind == inizio_ind) {
-        printf("%d", station_array[inizio_ind]);
-        return;
-    }
-    print_path(inizio_ind, pred[fine_ind], pred);
-    printf(" %d", station_array[fine_ind]);
-}
-
 void pushQueue(Queue* queue, int el) {
-    if ((queue->tail + 1) % queue->max_size == queue->head) {
-        printf("Queue full\n");
-        printf("queue->max_size: %d\n", queue->max_size);
-        printf("queue->head: %d queue->tail: %d\n", queue->head, queue->tail);
-        printQueue(queue);
-        exit(-1);
-    }
-
     if (isEmpty(*queue))
         queue->head = queue->tail = 0;
     else
-        queue->tail = (queue->tail + 1) % queue->max_size;
+        queue->tail = (queue->tail + 1);
 
     queue->arr[queue->tail] = el;
 }
 
 int popQueue(Queue* queue) {
-    if (isEmpty(*queue)) {
-        printf("Queue empty\n");
-        exit(-1);
-    }
-
     int vertex = queue->arr[queue->head];
 
     if (queue->head == queue->tail)
         queue->head = queue->tail = -1;
     else
-        queue->head = (queue->head + 1) % queue->max_size;
+        queue->head = (queue->head + 1);
 
     return vertex;
 }
 
 bool isEmpty(Queue queue) {
     return (queue.head == -1);
-}
-
-
-
-void printQueue(Queue * queue) {
-    printf("DEBUG: Printing queue\n");
-    if (queue->head == queue->tail) {
-        printf("Queue is empty.\n");
-    } else {
-        for (int i = queue->head; i < queue->tail; i++){
-            printf("%d ", queue->arr[i]);
-        }
-        printf("\n");
-    }
 }
 
 void pianifica_percorso_list(int inizio_ind, int fine_ind , int n) {
@@ -612,41 +561,19 @@ void pianifica_percorso_list(int inizio_ind, int fine_ind , int n) {
     while(!isEmpty(queue)){
         int size = queue.tail - queue.head + 1;
         while(size-- > 0){
-            //printf("DEBUG: size = %d\n", size+1);
             int vertex = popQueue(&queue);
             size--;
-            //printf("DEBUG: Entering in for loop with vertex: %d\n", vertex);
             for(int i = vertex + 1; i <= adjList[vertex]; i++){
                 if(distance[i] == -1){
                     distance[i] = distance[vertex] + 1;
                     path[i] = vertex;
-                    //printf("DEBUG: Printing path [distance] array\n");
-                    //for(int j = 0; j < n; j++){
-                    //    printf("%d <- %d\t[%d]\n", j, path[j], distance[j]);
-                    //}
                     pushQueue(&queue, i);
                     size++;
-                    //printQueue(&queue);
                 }
                 else{
                     distance[i] = distance[i] <= distance[vertex] + 1 ? distance[i] : distance[vertex] + 1;
-                    if(distance[i] == distance[vertex]+1){
-                        //printf("-----CASO----\n");
-                        if(station_array[vertex] < station_array[path[i]]){
-                            //printf("-------CASO PAZZO-------\n");
-                            path[i] = vertex;
-                            //printf("DEBUG: Printing path [distance] array\n");
-                            //for(int j = 0; j < n; j++){
-                            //    printf("%d <- %d\t[%d]\n", j, path[j], distance[j]);
-                            //}
-
-                            //pushQueue(&queue, i);
-                            //size++;
-
-                            //printf("pushed %d in queue\n", i);
-                            //printQueue(&queue);
-                        }
-                    }
+                    if(distance[i] == distance[vertex]+1 && station_array[vertex] < station_array[path[i]])
+                        path[i] = vertex;
                 }
             }
         }
@@ -654,10 +581,12 @@ void pianifica_percorso_list(int inizio_ind, int fine_ind , int n) {
 
     if (distance[fine_ind] == -1){
         printf("nessun percorso\n");
+        free(queue.arr);
+        free(path);
+        free(distance);
         return;
     }
 
-    //printAdj(n);
     print_reverse_path(path, n);
 
     free(queue.arr);
@@ -672,25 +601,16 @@ void build_adjList(int n) {
         bool enoughClose = true;
         int j = i+1;
         while(enoughClose){
-            if(j < n && maximum_array[i] >= abs(station_array[i] - station_array[j]))
+            if(maximum_array[i] >= abs(station_array[i] - station_array[j]) && j < n )
                 adjList[i] = j;
             j++;
-            if(j >= n || maximum_array[i] < abs(station_array[i] - station_array[j]))
+            if(maximum_array[i] < abs(station_array[i] - station_array[j]) || j >= n )
                 enoughClose = false;
         }
     }
-    //printAdj(n);
 }
-
-void printAdj(int n){
-    for(int i = 0; i < n; i++){
-        printf("%d [km %d, aut %d]: %d\n", i, station_array[i], maximum_array[i], adjList[i]);
-    }
-}
-
 
 void print_reverse_path(const int *pred, int n) {
-    // Store the stations in a stack
     int stack[n];
     int top = -1;
 
@@ -701,7 +621,6 @@ void print_reverse_path(const int *pred, int n) {
     }
     stack[++top] = 0;
 
-    // Print the stations in reverse order
     printf("%d ", station_array[stack[top]]);
     for (int i = top - 1; i > 0; i--) {
         printf("%d ", station_array[stack[i]]);
