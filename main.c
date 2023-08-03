@@ -20,16 +20,11 @@ typedef struct list_node{
     struct list_node * right;
 } list_node;
 
-typedef struct queueNode{
-    int ind;
-    struct queueNode * next;
-}queueNode;
-
 typedef struct{
-    queueNode * arr;
-    queueNode * head;
-    queueNode * tail;
-    int size;
+    int * arr;
+    int head;
+    int tail;
+    int max_size;
 } Queue;
 
 int aggiungi_stazione(int);
@@ -47,6 +42,7 @@ node_t * insertCar(node_t * root, int autonomy);
 void inOrderPrint(node_t *pNode);
 node_t * freeTree(node_t *);
 int countNodes(list_node* curr);
+void print_reverse_path(const int *, int);
 
 void build_adjList(int n);
 void printAdj(int n);
@@ -54,8 +50,7 @@ void printAdj(int n);
 void pushQueue(Queue * , int);
 int popQueue(Queue *);
 bool isEmpty(Queue);
-queueNode * newQueueNode(int);
-
+void printQueue(Queue *queue);
 
 list_node * stations = NULL;
 int * station_array;
@@ -447,7 +442,7 @@ list_node * findStation(int k){
         while(curr != NULL){
             if(curr->kilometer == k)
                 return curr;
-             curr = k > curr->kilometer ? curr->right : curr->left;
+            curr = k > curr->kilometer ? curr->right : curr->left;
         }
     }
     return NULL;
@@ -538,22 +533,21 @@ void print_path(int inizio_ind, int fine_ind, int pred[]) {
     printf(" %d", station_array[fine_ind]);
 }
 
-queueNode * newQueueNode(int el){
-    queueNode * new = (queueNode *) malloc(sizeof(queueNode));
-    new->ind = el;
-    new->next = NULL;
-    return new;
-}
-
 void pushQueue(Queue* queue, int el) {
-    if(queue->tail == NULL && queue->head == NULL){
-        queue->head = queue->tail = newQueueNode(el);
+    if ((queue->tail + 1) % queue->max_size == queue->head) {
+        printf("Queue full\n");
+        printf("queue->max_size: %d\n", queue->max_size);
+        printf("queue->head: %d queue->tail: %d\n", queue->head, queue->tail);
+        printQueue(queue);
+        exit(-1);
     }
-    else{
-        queue->tail->next = newQueueNode(el);
-        queue->tail = queue->tail->next;
-    }
-    queue->size++;
+
+    if (isEmpty(*queue))
+        queue->head = queue->tail = 0;
+    else
+        queue->tail = (queue->tail + 1) % queue->max_size;
+
+    queue->arr[queue->tail] = el;
 }
 
 int popQueue(Queue* queue) {
@@ -562,53 +556,30 @@ int popQueue(Queue* queue) {
         exit(-1);
     }
 
-    int res = queue->head->ind;
-    queueNode* temp = queue->head;
-    queue->head = queue->head->next;
+    int vertex = queue->arr[queue->head];
 
-    // If the queue becomes empty after popping the only element
-    if (queue->head == NULL) {
-        queue->tail = NULL; // Update tail to NULL
-    }
+    if (queue->head == queue->tail)
+        queue->head = queue->tail = -1;
+    else
+        queue->head = (queue->head + 1) % queue->max_size;
 
-    free(temp); // Free the memory of the popped node
-    queue->size--; // Decrement the size after popping
-    return res;
+    return vertex;
 }
-
 
 bool isEmpty(Queue queue) {
-    return (queue.size == 0);
+    return (queue.head == -1);
 }
 
-void print_reverse_path(const int *pred, int n) {
-    // Store the stations in a stack
-    int stack[n];
-    int top = -1;
 
-    int current = n-1;
-    while (current != 0) {
-        stack[++top] = current;
-        current = pred[current];
-    }
-    stack[++top] = 0;
-
-    // Print the stations in reverse order
-    printf("%d ", station_array[stack[top]]);
-    for (int i = top - 1; i > 0; i--) {
-        printf("%d ", station_array[stack[i]]);
-    }
-    printf("%d\n", station_array[stack[0]]);
-}
 
 void printQueue(Queue * queue) {
     printf("DEBUG: Printing queue\n");
     if (queue->head == queue->tail) {
         printf("Queue is empty.\n");
     } else {
-        //for (int i = queue->head; i < queue->tail; i++) {
-          //  printf("%d ", queue->arr[i]);
-        //}
+        for (int i = queue->head; i < queue->tail; i++){
+            printf("%d ", queue->arr[i]);
+        }
         printf("\n");
     }
 }
@@ -631,17 +602,20 @@ void pianifica_percorso_list(int inizio_ind, int fine_ind , int n) {
     path[0] = 0;
 
     Queue queue;
-    queue.head = NULL;
-    queue.tail = NULL;
-    queue.size = 0;
+    queue.head = -1;
+    queue.tail = -1;
+    queue.max_size = n;
+    queue.arr = (int *) malloc(queue.max_size * sizeof(int));
 
     pushQueue(&queue, 0);
 
     while(!isEmpty(queue)){
-        while(queue.size > 0){
+        int size = queue.tail - queue.head + 1;
+        while(size-- > 0){
             //printf("DEBUG: size = %d\n", size+1);
             int vertex = popQueue(&queue);
-                        //printf("DEBUG: Entering in for loop with vertex: %d\n", vertex);
+            size--;
+            //printf("DEBUG: Entering in for loop with vertex: %d\n", vertex);
             for(int i = vertex + 1; i <= adjList[vertex]; i++){
                 if(distance[i] == -1){
                     distance[i] = distance[vertex] + 1;
@@ -651,7 +625,8 @@ void pianifica_percorso_list(int inizio_ind, int fine_ind , int n) {
                     //    printf("%d <- %d\t[%d]\n", j, path[j], distance[j]);
                     //}
                     pushQueue(&queue, i);
-                                        //printQueue(&queue);
+                    size++;
+                    //printQueue(&queue);
                 }
                 else{
                     distance[i] = distance[i] <= distance[vertex] + 1 ? distance[i] : distance[vertex] + 1;
@@ -664,7 +639,10 @@ void pianifica_percorso_list(int inizio_ind, int fine_ind , int n) {
                             //for(int j = 0; j < n; j++){
                             //    printf("%d <- %d\t[%d]\n", j, path[j], distance[j]);
                             //}
-                            pushQueue(&queue, i);
+
+                            //pushQueue(&queue, i);
+                            //size++;
+
                             //printf("pushed %d in queue\n", i);
                             //printQueue(&queue);
                         }
@@ -682,12 +660,7 @@ void pianifica_percorso_list(int inizio_ind, int fine_ind , int n) {
     //printAdj(n);
     print_reverse_path(path, n);
 
-    queueNode * curr = queue.head;
-    while(curr != NULL){
-        queueNode * prev = curr;
-        curr = curr->next;
-        free(prev);
-    }
+    free(queue.arr);
     free(path);
     free(distance);
 }
@@ -715,3 +688,23 @@ void printAdj(int n){
     }
 }
 
+
+void print_reverse_path(const int *pred, int n) {
+    // Store the stations in a stack
+    int stack[n];
+    int top = -1;
+
+    int current = n-1;
+    while (current != 0) {
+        stack[++top] = current;
+        current = pred[current];
+    }
+    stack[++top] = 0;
+
+    // Print the stations in reverse order
+    printf("%d ", station_array[stack[top]]);
+    for (int i = top - 1; i > 0; i--) {
+        printf("%d ", station_array[stack[i]]);
+    }
+    printf("%d\n", station_array[stack[0]]);
+}
