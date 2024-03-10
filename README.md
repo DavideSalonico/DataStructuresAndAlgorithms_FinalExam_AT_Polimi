@@ -1,4 +1,15 @@
-#Data Structures and Algorithm Final Exam @ Politecnico di Milano
-Source code, specs, rules and tests
+# Data Structure and Algorithms Final Exam @ Polimi 🚀
 
-Grade: 30/30
+Impletentation of an algorithm (in C) to fulfill correctness and efficiency specs
+
+## Goal 🎯
+
+Explain the main objective or purpose of your project.
+
+## Team 👥
+
+- [Davide Salonico](https://github.com/DavideSalonico)
+
+## Grade 🏆
+
+30/30
